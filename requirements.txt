@@ -1,7 +1,11 @@
 streamlit
-firebase-admin
+git+https://github.com/nhorvath/Pyrebase4.git
 requests
-google-cloud-storage
+firebase-admin
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
+google-cloud-firestore
+google-cloud-storage
+setuptools
+wheel
