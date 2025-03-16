@@ -1,7 +1,9 @@
 streamlit
-pyrebase4
-firebase-admin
-google-cloud-storage
-google-auth
-oauth2client
+pyrebase4==4.5.0
 requests
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-cloud-firestore
+google-cloud-storage
+setuptools
