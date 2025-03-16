@@ -66,16 +66,18 @@ def my_page():
     st.subheader("動画検索")
     search_keyword = st.text_input("キーワードを入力")
     if st.button("検索"):
-        search_results = []
+        found = False
         for genre in ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"]:
             videos = db.child("videos").child(genre).get(st.session_state["id_token"])
             if videos.val():
                 for vid in videos.each():
                     video_data = vid.val()
                     if search_keyword.lower() in video_data.get("title", "").lower():
-                        search_results = {"title": video_data["title"], "url": video_data["url"]}
-                        st.write(search_results["title"])
-                        st.video(search_results["url"])
+                        st.write(video_data["title"])
+                        st.video(video_data["url"])
+                        found = True
+        if not found:
+            st.info("該当する動画が見つかりませんでした")
 
     genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
     videos = db.child("videos").child(genre).get(st.session_state["id_token"])
@@ -104,7 +106,40 @@ def my_page():
                     st.success("お気に入りから削除しました！")
                     st.rerun()
 
-# 管理者ページのコードは変更不要のため省略
+# 🔹 管理者ページ（復元済）
+def admin_page():
+    st.title("管理者画面")
+    genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
+
+    video_title = st.text_input("動画タイトル")
+    youtube_url = st.text_input("動画URL")
+    video_tag = st.text_input("動画タグ (カンマ区切り)")
+
+    if st.button("追加"):
+        db.child("videos").child(genre).push({
+            "title": video_title,
+            "url": youtube_url,
+            "tags": video_tag.split(",")
+        }, st.session_state["id_token"])
+        st.success("動画を追加しました！")
+        st.rerun()
+
+    videos = db.child("videos").child(genre).get(st.session_state["id_token"])
+    if videos.val():
+        cols = st.columns(3)
+        for idx, vid in enumerate(videos.each()):
+            video_data = vid.val()
+            with cols[idx % 3]:
+                st.write(video_data["title"])
+                st.video(video_data["url"])
+                if st.button("削除", key=f"del_{vid.key()}"):
+                    db.child("videos").child(genre).child(vid.key()).remove(st.session_state["id_token"])
+                    st.success("動画を削除しました！")
+                    st.rerun()
+
+    if st.button("ログアウト"):
+        st.session_state.clear()
+        st.rerun()
 
 # 🔹 画面遷移
 if st.session_state["logged_in"]:
