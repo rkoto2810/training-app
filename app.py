@@ -37,6 +37,8 @@ def login_page():
 
     if choice == "新規登録":
         if st.button("アカウント作成"):
+            email = email.strip()
+            password = password.strip()
             if not email or not password:
                 st.error("メールアドレスとパスワードを入力してください")
             else:
@@ -48,6 +50,8 @@ def login_page():
 
     if choice == "ログイン":
         if st.button("ログイン"):
+            email = email.strip()
+            password = password.strip()
             if not email or not password:
                 st.error("メールアドレスとパスワードを入力してください")
             else:
