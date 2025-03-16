@@ -1,5 +1,6 @@
 streamlit
-pyrebase4==4.5.0
+pyrebase4
+firebase-admin
 requests
 google-auth
 google-auth-oauthlib
@@ -7,4 +8,4 @@ google-auth-httplib2
 google-cloud-firestore
 google-cloud-storage
 setuptools
-git+https://github.com/nhorvath/Pyrebase4.git
+wheel
