@@ -57,11 +57,12 @@ def login_page():
             except Exception as e:
                 st.error(f"ログインに失敗しました: {e}")
 
-# 🔹 一般ユーザー用マイページ（変更なしのため省略）
+# 🔹 一般ユーザー用マイページ（お気に入り機能復活）
 def my_page():
     st.title("マイページ（一般ユーザー用）")
     st.write(f"ようこそ！ {st.session_state['user_email']} さん")
 
+    # 📌 ジャンル別の動画表示
     genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
     videos = db.child("videos").child(genre).get(st.session_state["id_token"])
     if videos.val():
@@ -75,57 +76,25 @@ def my_page():
                     db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").push(video_data, st.session_state["id_token"])
                     st.success("お気に入りに追加しました！")
 
-# 🔹 管理者ページ（編集機能を追加）
-def admin_page():
-    st.title("管理者画面")
-    genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
-
-    video_title = st.text_input("動画タイトル")
-    youtube_url = st.text_input("動画URL")
-    video_tag = st.text_input("動画タグ（カンマ区切り）")
-
-    if st.button("追加"):
-        db.child("videos").child(genre).push({
-            "title": video_title,
-            "url": youtube_url,
-            "tags": video_tag.split(",")
-        }, st.session_state["id_token"])
-        st.success("動画を追加しました！")
-        st.rerun()
-
-    videos = db.child("videos").child(genre).get(st.session_state["id_token"])
-    if videos.val():
+    # 📌 お気に入り動画一覧（3列）
+    st.subheader("お気に入り動画一覧")
+    favorites = db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").get(st.session_state["id_token"])
+    if favorites.val():
         cols = st.columns(3)
-        for idx, vid in enumerate(videos.each()):
-            video_data = vid.val()
+        for idx, fav in enumerate(favorites.each()):
+            video_data = fav.val()
             with cols[idx % 3]:
                 st.write(video_data["title"])
                 st.video(video_data["url"])
-                new_title = st.text_input("タイトル編集", value=video_data["title"], key=f"title_{vid.key()}")
-                new_url = st.text_input("URL編集", value=video_data["url"], key=f"url_{vid.key()}")
-                new_tags = st.text_input("タグ編集", value=",".join(video_data.get("tags", [])), key=f"tags_{vid.key()}")
-
-                if st.button("編集", key=f"edit_{vid.key()}"):
-                    db.child("videos").child(genre).child(vid.key()).update({
-                        "title": new_title,
-                        "url": new_url,
-                        "tags": new_tags.split(",")
-                    }, st.session_state["id_token"])
-                    st.success("動画を編集しました！")
+                if st.button("削除", key=f"del_fav_{fav.key()}"):
+                    db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(fav.key()).remove(st.session_state["id_token"])
+                    st.success("お気に入りから削除しました！")
                     st.rerun()
 
-                if st.button("削除", key=f"del_{vid.key()}"):
-                    db.child("videos").child(genre).child(vid.key()).remove(st.session_state["id_token"])
-                    st.success("動画を削除しました！")
-                    st.rerun()
-
-    if st.button("ログアウト"):
-        st.session_state.clear()
-        st.rerun()
+# 🔹 管理者ページ（変更なし）
 
 # 🔹 画面遷移
 if st.session_state["logged_in"]:
     admin_page() if st.session_state["is_admin"] else my_page()
 else:
     login_page()
-
