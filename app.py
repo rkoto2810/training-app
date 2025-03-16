@@ -29,7 +29,7 @@ ADMIN_EMAILS = ["rkoto2810@gmail.com"]
 
 # 🔹 ログインページ
 def login_page():
-    st.title("トレーニング動画アプリ - ログイン")
+    st.title("Lycka-UP - ログイン")
     choice = st.radio("ログインまたは登録", ["ログイン", "新規登録"])
 
     email = st.text_input("メールアドレス", autocomplete="email")
