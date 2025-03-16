@@ -1,5 +1,6 @@
 import streamlit as st
 import pyrebase
+from datetime import datetime
 
 # 🔥 Firebaseの設定
 firebase_config = {
@@ -32,7 +33,7 @@ def login_page():
     choice = st.radio("ログインまたは登録", ["ログイン", "新規登録"])
 
     email = st.text_input("メールアドレス", autocomplete="email")
-    password = st.text_input("パスワード", type="password", autocomplete="current-password")
+    password = st.text_input("パスワード", type="password")
 
     if choice == "新規登録":
         if st.button("アカウント作成"):
@@ -56,10 +57,17 @@ def login_page():
             except Exception as e:
                 st.error(f"ログインに失敗しました: {e}")
 
-# 🔹 一般ユーザー用マイページ（お気に入りフォルダ機能なし）
+# 🔹 一般ユーザー用マイページ（アプリ内通知追加）
 def my_page():
     st.title("マイページ（一般ユーザー用）")
     st.write(f"ようこそ！ {st.session_state['user_email']} さん")
+
+    # 📢 アプリ内通知表示
+    st.subheader("最新のお知らせ")
+    notifications = db.child("notifications").order_by_key().limit_to_last(5).get(st.session_state["id_token"]).val()
+    if notifications:
+        for notif in reversed(notifications.values()):
+            st.info(f"【{notif['genre']}】{notif['title']}（追加日: {notif['timestamp'][:10]}）")
 
     genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
     videos = db.child("videos").child(genre).get(st.session_state["id_token"])
@@ -71,22 +79,46 @@ def my_page():
             with cols[idx % 3]:
                 st.write(video_data.get("title", "タイトルなし"))
                 st.video(video_data["url"])
-                if st.button("お気に入り追加", key=f"fav_add_{vid.key()}"):
+
+                if st.button("お気に入り追加", key=f"fav_{vid.key()}"):
                     db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").push(video_data, st.session_state["id_token"])
                     st.success("お気に入りに追加しました！")
 
+    # 📌 お気に入り動画一覧
     st.subheader("お気に入り動画一覧")
     user_fav = db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").get(st.session_state["id_token"]).val()
     if user_fav:
         cols = st.columns(3)
-        for idx, (vid_key, video_data) in enumerate(user_fav.items()):
+        for idx, (fav_key, video_data) in enumerate(user_fav.items()):
             with cols[idx % 3]:
                 st.write(video_data.get("title", "タイトルなし"))
                 st.video(video_data["url"])
-                if st.button("削除", key=f"del_{vid_key}"):
-                    db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(vid_key).remove(st.session_state["id_token"])
-                    st.success("削除しました")
+                if st.button("削除", key=f"del_{vid.key()}"):
+                    db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(fav.key()).remove(st.session_state["id_token"])
+                    st.success("お気に入りから削除しました！")
                     st.rerun()
+
+# 🔹 管理者ページ（通知機能を追加）
+def admin_page():
+    st.title("管理者画面")
+    genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
+
+    video_title = st.text_input("動画タイトル")
+    youtube_url = st.text_input("動画URL")
+
+    if st.button("追加"):
+        db.child("videos").child(genre).push({
+            "title": video_title,
+            "url": youtube_url,
+            "added_at": datetime.now().isoformat()
+        }, st.session_state["id_token"])
+        db.child("notifications").push({"title": video_title, "genre": genre, "timestamp": datetime.now().isoformat()})
+        st.success("動画を追加しました！")
+        st.rerun()
+
+    if st.button("ログアウト"):
+        st.session_state.clear()
+        st.rerun()
 
 # 🔹 画面遷移
 if st.session_state["logged_in"]:
