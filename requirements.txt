@@ -1,4 +1,4 @@
 streamlit
-pyrebase4
+import pyrebase4 as pyrebase
 requests
 google-cloud-storage
