@@ -57,14 +57,14 @@ def login_page():
             except Exception as e:
                 st.error(f"ログインに失敗しました: {e}")
 
-# 🔹 一般ユーザー用マイページ（お気に入り機能復活）
+# 🔹 一般ユーザー用マイページ（お気に入りフォルダ機能追加）
 def my_page():
     st.title("マイページ（一般ユーザー用）")
     st.write(f"ようこそ！ {st.session_state['user_email']} さん")
 
-    # 📌 ジャンル別の動画表示
     genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
     videos = db.child("videos").child(genre).get(st.session_state["id_token"])
+
     if videos.val():
         cols = st.columns(3)
         for idx, vid in enumerate(videos.each()):
@@ -73,25 +73,40 @@ def my_page():
                 st.write(video_data["title"])
                 st.video(video_data["url"])
                 if st.button("お気に入り追加", key=f"fav_{vid.key()}"):
-                    db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").push(video_data, st.session_state["id_token"])
-                    st.success("お気に入りに追加しました！")
+                    folder_name = st.selectbox("お気に入りフォルダを選択", get_folders() + ["新規作成"], key=f"folder_select_{vid.key()}")
+                    if folder_name == "新規作成":
+                        new_folder_name = st.text_input("新しいフォルダ名", key=f"new_folder_{vid.key()}")
+                        if st.button("フォルダ作成", key=f"create_folder_{vid.key()}"):
+                            folder_name = new_folder_name
+                            db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(new_folder_name).push(video_data, st.session_state["id_token"])
+                            st.success("フォルダとお気に入りを作成しました！")
+                    elif st.button("お気に入り追加", key=f"add_{vid.key()}"):
+                        db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(folder_name).push(video_data, st.session_state["id_token"])
+                        st.success("お気に入りに追加しました！")
 
-    # 📌 お気に入り動画一覧（3列）
+    # 📌 お気に入りフォルダ別一覧
     st.subheader("お気に入り動画一覧")
-    favorites = db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").get(st.session_state["id_token"])
-    if favorites.val():
-        cols = st.columns(3)
-        for idx, fav in enumerate(favorites.each()):
-            video_data = fav.val()
-            with cols[idx % 3]:
-                st.write(video_data["title"])
-                st.video(video_data["url"])
-                if st.button("削除", key=f"del_fav_{fav.key()}"):
-                    db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(fav.key()).remove(st.session_state["id_token"])
-                    st.success("お気に入りから削除しました！")
-                    st.rerun()
+    user_fav = db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").get(st.session_state["id_token"]).val()
+
+    if user_fav:
+        for folder, vids in user_fav.items():
+            st.write(f"📁 {folder}")
+            cols = st.columns(3)
+            for idx, (vid_key, video_data) in enumerate(user_fav[folder].items()):
+                with cols[idx % 3]:
+                    st.write(video_data["title"])
+                    st.video(video_data["url"])
+                    if st.button("削除", key=f"del_{vid.key()}"):
+                        db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(folder_name).child(vid.key()).remove(st.session_state["id_token"])
+                        st.success("お気に入りから削除しました！")
+                        st.rerun()
 
 # 🔹 管理者ページ（変更なし）
+
+# フォルダ名取得用関数
+def get_folder_names():
+    folders = db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").shallow().get(st.session_state["id_token"]).val()
+    return list(folders) if folders else []
 
 # 🔹 画面遷移
 if st.session_state["logged_in"]:
