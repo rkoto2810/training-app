@@ -1,5 +1,6 @@
 import streamlit as st
-import pyrebase
+import pyrebase4 as pyrebase
+
 
 # 🔥 Firebaseの設定
 firebase_config = {
