@@ -1,5 +1,5 @@
 streamlit
-pyrebase
+git+https://github.com/nhorvath/Pyrebase4.git
 firebase-admin
 requests
 google-auth
