@@ -1,5 +1,5 @@
 import streamlit as st
-import pyrebase  # <- 修正（pyrebase4ではなくpyrebaseを指定）
+import pyrebase
 
 # 🔥 Firebaseの設定
 firebase_config = {
@@ -19,14 +19,9 @@ auth = firebase.auth()
 db = firebase.database()
 
 # 🔹 セッション状態を管理
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
-if "user_email" not in st.session_state:
-    st.session_state["user_email"] = ""
-if "id_token" not in st.session_state:
-    st.session_state["id_token"] = None
-if "is_admin" not in st.session_state:
-    st.session_state["is_admin"] = False
+for key in ["logged_in", "user_email", "id_token", "is_admin"]:
+    if key not in st.session_state:
+        st.session_state[key] = False if key != "user_email" else ""
 
 # 🔹 管理者設定
 ADMIN_EMAILS = ["rkoto2810@gmail.com"]
@@ -52,10 +47,12 @@ def login_page():
         if st.button("ログイン"):
             try:
                 user = auth.sign_in_with_email_and_password(email, password)
-                st.session_state["logged_in"] = True
-                st.session_state["user_email"] = user["email"]
-                st.session_state["id_token"] = user["idToken"]
-                st.session_state["is_admin"] = user["email"] in ADMIN_EMAILS
+                st.session_state.update({
+                    "logged_in": True,
+                    "user_email": user["email"],
+                    "id_token": user["idToken"],
+                    "is_admin": user["email"] in ADMIN_EMAILS
+                })
                 st.rerun()
             except Exception as e:
                 st.error(f"ログインに失敗しました: {e}")
@@ -65,23 +62,34 @@ def my_page():
     st.title("マイページ（一般ユーザー用）")
     st.write(f"ようこそ！ {st.session_state['user_email']} さん")
 
-    # ジャンル別動画表示
-    st.subheader("トレーニング動画を検索")
-    genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
+    # 動画検索機能
+    st.subheader("動画検索")
+    search_keyword = st.text_input("キーワードを入力")
+    if st.button("検索"):
+        search_results = []
+        for genre in ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"]:
+            videos = db.child("videos").child(genre).get(st.session_state["id_token"])
+            if videos.val():
+                for vid in videos.each():
+                    video_data = vid.val()
+                    if search_keyword.lower() in video_data.get("title", "").lower():
+                        search_results = {"title": video_data["title"], "url": video_data["url"]}
+                        st.write(search_results["title"])
+                        st.video(search_results["url"])
 
+    genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
     videos = db.child("videos").child(genre).get(st.session_state["id_token"])
     if videos.val():
         cols = st.columns(3)
         for idx, vid in enumerate(videos.each()):
             video_data = vid.val()
             with cols[idx % 3]:
-                st.write(video_data.get("title", "タイトルなし"))
+                st.write(f"**{video_data['title']}**")
                 st.video(video_data["url"])
                 if st.button("お気に入り追加", key=f"fav_{vid.key()}"):
                     db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").push(video_data, st.session_state["id_token"])
                     st.success("お気に入りに追加しました！")
 
-    # お気に入り一覧（3列）
     st.subheader("お気に入り動画一覧")
     favorites = db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").get(st.session_state["id_token"])
     if favorites.val():
@@ -89,43 +97,14 @@ def my_page():
         for idx, fav in enumerate(favorites.each()):
             video_data = fav.val()
             with cols[idx % 3]:
-                st.write(video_data.get("title", "No Title"))
+                st.write(video_data["title"])
                 st.video(video_data["url"])
                 if st.button("削除", key=f"del_fav_{fav.key()}"):
                     db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(fav.key()).remove(st.session_state["id_token"])
                     st.success("お気に入りから削除しました！")
                     st.rerun()
 
-# 🔹 管理者画面
-def admin_page():
-    st.title("管理者画面")
-    genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
-
-    video_title = st.text_input("動画タイトル")
-    youtube_url = st.text_input("動画URL")
-
-    if st.button("追加"):
-        db.child("videos").child(genre).push({"title": video_title, "url": youtube_url}, st.session_state["id_token"])
-        st.success("動画を追加しました！")
-        st.rerun()
-
-    # 動画一覧
-    videos = db.child("videos").child(genre).get(st.session_state["id_token"])
-    if videos.val():
-        cols = st.columns(3)
-        for idx, vid in enumerate(videos.each()):
-            video_data = vid.val()
-            with cols[idx % 3]:
-                st.write(video_data.get("title", "No Title"))
-                st.video(video_data["url"])
-                if st.button("削除", key=f"del_{vid.key()}"):
-                    db.child("videos").child(genre).child(vid.key()).remove(st.session_state["id_token"])
-                    st.success("動画を削除しました！")
-                    st.rerun()
-
-    if st.button("ログアウト"):
-        st.session_state.clear()
-        st.rerun()
+# 管理者ページのコードは変更不要のため省略
 
 # 🔹 画面遷移
 if st.session_state["logged_in"]:
