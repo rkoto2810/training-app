@@ -63,11 +63,13 @@ def login_page():
                 except Exception as e:
                     st.error(f"ログインに失敗しました: {e}")
 
-# 🔹 一般ユーザー用マイページ
+# 🔹 一般ユーザー用マイページ（お気に入り一覧を追加）
 def my_page():
     st.title("マイページ（一般ユーザー用）")
     st.write(f"ようこそ！ {st.session_state['user_email']} さん")
 
+    # 📌 ジャンル別動画表示
+    st.subheader("トレーニング動画を検索")
     genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
     videos = db.child("videos").child(genre).get(st.session_state["id_token"])
 
@@ -81,6 +83,23 @@ def my_page():
                 if st.button("お気に入り追加", key=f"fav_{vid.key()}"):
                     db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").push(video_data, st.session_state["id_token"])
                     st.success("お気に入りに追加しました！")
+                    st.rerun()
+
+    # 📌 お気に入り動画一覧
+    st.subheader("お気に入り動画一覧")
+    favorites = db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").get(st.session_state["id_token"])
+
+    if favorites.val():
+        cols = st.columns(3)
+        for idx, fav in enumerate(favorites.each()):
+            video_data = fav.val()
+            with cols[idx % 3]:
+                st.write(f"🎥 {video_data.get('title', 'No Title')}")
+                st.video(video_data["url"])
+                if st.button("削除", key=f"del_fav_{fav.key()}"):
+                    db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(fav.key()).remove(st.session_state["id_token"])
+                    st.success("お気に入りから削除しました！")
+                    st.rerun()
 
 # 🔹 管理者ページ（タグ付けと編集機能追加）
 def admin_page():
