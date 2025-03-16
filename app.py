@@ -77,32 +77,20 @@ def my_page():
                     db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").push(video_data, st.session_state["id_token"])
                     st.success("お気に入りに追加しました！")
 
-    # 📌 お気に入り動画一覧
-    st.subheader("お気に入り動画一覧")
-    user_fav = db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").get(st.session_state["id_token"]).val()
-    if user_fav:
-        cols = st.columns(3)
-        for idx, (fav_key, video_data) in enumerate(user_fav.items()):
-            with cols[idx % 3]:
-                st.write(video_data.get("title", "タイトルなし"))
-                st.video(video_data["url"])
-                if st.button("削除", key=f"del_{fav_key}"):
-                    db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(fav_key).remove(st.session_state["id_token"])
-                    st.success("お気に入りから削除しました！")
-                    st.rerun()
-
-# 🔹 管理者ページ（削除機能を修正済み）
+# 🔹 管理者ページ（タグ付けと編集機能追加）
 def admin_page():
     st.title("管理者画面")
     genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
 
     video_title = st.text_input("動画タイトル")
     youtube_url = st.text_input("動画URL")
+    video_tags = st.text_input("タグ（カンマ区切り）")
 
     if st.button("追加"):
         db.child("videos").child(genre).push({
             "title": video_title,
             "url": youtube_url,
+            "tags": video_tags.split(","),
             "added_at": datetime.now().isoformat()
         }, st.session_state["id_token"])
         db.child("notifications").push({"title": video_title, "genre": genre, "added_at": datetime.now().isoformat()}, st.session_state["id_token"])
@@ -118,6 +106,19 @@ def admin_page():
             with cols[idx % 3]:
                 st.write(video_data["title"])
                 st.video(video_data["url"])
+                new_title = st.text_input("新しいタイトル", value=video_data["title"], key=f"title_{video_key}")
+                new_url = st.text_input("新しいURL", value=video_data["url"], key=f"url_{video_key}")
+                new_tags = st.text_input("新しいタグ", value=",".join(video_data.get("tags", [])), key=f"tags_{video_key}")
+
+                if st.button("編集", key=f"edit_{video_key}"):
+                    db.child("videos").child(genre).child(video_key).update({
+                        "title": new_title,
+                        "url": new_url,
+                        "tags": new_tags.split(",")
+                    }, st.session_state["id_token"])
+                    st.success("動画を編集しました！")
+                    st.rerun()
+
                 if st.button("削除", key=f"del_{video_key}"):
                     db.child("videos").child(genre).child(video_key).remove(st.session_state["id_token"])
                     st.success("動画を削除しました！")
