@@ -33,7 +33,7 @@ def login_page():
     choice = st.radio("ログインまたは登録", ["ログイン", "新規登録"])
 
     email = st.text_input("メールアドレス", autocomplete="email")
-    password = st.text_input("パスワード", type="password")
+    password = st.text_input("パスワード", type="password", autocomplete="current-password")
 
     if choice == "新規登録":
         if st.button("アカウント作成"):
@@ -62,13 +62,6 @@ def my_page():
     st.title("マイページ（一般ユーザー用）")
     st.write(f"ようこそ！ {st.session_state['user_email']} さん")
 
-    # 📢 アプリ内通知表示
-    st.subheader("最新のお知らせ")
-    notifications = db.child("notifications").order_by_key().limit_to_last(5).get(st.session_state["id_token"]).val()
-    if notifications:
-        for notif in reversed(notifications.values()):
-            st.info(f"【{notif['genre']}】{notif['title']}（追加日: {notif['timestamp'][:10]}）")
-
     genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
     videos = db.child("videos").child(genre).get(st.session_state["id_token"])
 
@@ -77,7 +70,7 @@ def my_page():
         for idx, vid in enumerate(videos.each()):
             video_data = vid.val()
             with cols[idx % 3]:
-                st.write(video_data.get("title", "タイトルなし"))
+                st.write(video_data["title"])
                 st.video(video_data["url"])
 
                 if st.button("お気に入り追加", key=f"fav_{vid.key()}"):
@@ -93,12 +86,12 @@ def my_page():
             with cols[idx % 3]:
                 st.write(video_data.get("title", "タイトルなし"))
                 st.video(video_data["url"])
-                if st.button("削除", key=f"del_{vid.key()}"):
-                    db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(fav.key()).remove(st.session_state["id_token"])
+                if st.button("削除", key=f"del_{fav_key}"):
+                    db.child("users").child(st.session_state["user_email"].replace(".", "_")).child("favorites").child(fav_key).remove(st.session_state["id_token"])
                     st.success("お気に入りから削除しました！")
                     st.rerun()
 
-# 🔹 管理者ページ（通知機能を追加）
+# 🔹 管理者ページ（削除機能を修正済み）
 def admin_page():
     st.title("管理者画面")
     genre = st.selectbox("ジャンルを選択", ["スプリント", "ハードル", "投てき", "跳躍", "コンディショニング"])
@@ -112,9 +105,23 @@ def admin_page():
             "url": youtube_url,
             "added_at": datetime.now().isoformat()
         }, st.session_state["id_token"])
-        db.child("notifications").push({"title": video_title, "genre": genre, "timestamp": datetime.now().isoformat()})
+        db.child("notifications").push({"title": video_title, "genre": genre, "added_at": datetime.now().isoformat()}, st.session_state["id_token"])
         st.success("動画を追加しました！")
         st.rerun()
+
+    videos = db.child("videos").child(genre).get(st.session_state["id_token"])
+    if videos.val():
+        cols = st.columns(3)
+        for idx, vid in enumerate(videos.each()):
+            video_data = vid.val()
+            video_key = vid.key()
+            with cols[idx % 3]:
+                st.write(video_data["title"])
+                st.video(video_data["url"])
+                if st.button("削除", key=f"del_{video_key}"):
+                    db.child("videos").child(genre).child(video_key).remove(st.session_state["id_token"])
+                    st.success("動画を削除しました！")
+                    st.rerun()
 
     if st.button("ログアウト"):
         st.session_state.clear()
